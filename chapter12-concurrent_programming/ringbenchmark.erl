@@ -38,6 +38,11 @@ create_ring(N) ->
     
     create_links(end_ring(Fun), N).
 
+atom_to_integer(Atom) ->
+      erlang:list_to_integer(erlang:atom_to_list(Atom)).
+
+time_a_ring([N]) when is_atom(N) ->
+    time_a_ring(atom_to_integer(N));
 time_a_ring(N) ->
     Ring = create_ring(N),
     Ring ! {self(), now, erlang:now()},
