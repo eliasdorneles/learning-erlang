@@ -10,6 +10,24 @@ on_exit(Pid, Fun) ->
                   end
           end).
 
+zombie() ->
+    io:format("I'm still alive~n"),
+    timer:sleep(3000),
+    zombie().
+
+register_zombie() ->
+    Pid = spawn(?MODULE, zombie, []),
+    register(zombie, Pid),
+    Pid.
+
+monitor_zombie() ->
+    on_exit(whereis(zombie),
+            fun(_) ->
+                    io:format("restarting zombie ...~n"),
+                    register_zombie(),
+                    monitor_zombie()
+            end).
+
 spawn_with_timeout(Mod, Func, Args, Time) ->
     Pid = my_spawn(Mod, Func, Args),
     spawn(fun() ->
