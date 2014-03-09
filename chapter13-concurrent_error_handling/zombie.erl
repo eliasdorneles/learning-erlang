@@ -10,7 +10,32 @@ on_exit(Pid, Fun) ->
                   end
           end).
 
+iolist_to_atom(IoList) ->
+    list_to_atom(lists:flatten(IoList)).
+
+create_group_of_processes(N) ->
+    spawn(fun() ->
+                  for(1, N,
+                      fun(I) ->
+                              Mesg = io_lib:format("I'm a group process ~p~n", [I]),
+                              Name = iolist_to_atom(io_lib:format("goo~w", [I])),
+                              register(Name, spawn_link(fun() -> zombie(Mesg) end))
+                      end),
+                  receive after infinity -> true end
+          end).
+
+monitor_process_group(N) ->
+    %% Create N linked processes that die together, and are all restarted when one of them dies
+    Pid = create_group_of_processes(N),
+    on_exit(Pid,
+            fun(Why) ->
+                    io:format("A process of the group died: ~p~n", [Why]),
+                    io:format("Restarting all ~p processes...~n", [N]),
+                    monitor_process_group(N)
+            end).
+
 keep_alive(Name, Fun) ->
+    %% Creates a registered process that restarts when killed
     register(Name, Pid = spawn(Fun)),
     on_exit(Pid, fun(_Why) ->
                          io:format("~p died, restarting it...~n", [Name]),
@@ -21,7 +46,7 @@ monitor_some_processes(N) ->
     %% Create N processes that restart when killed
     for(1, N, fun(I) ->
                       Mesg = io_lib:format("I'm process ~p~n", [I]),
-                      Name = list_to_atom(lists:flatten(io_lib:format("zombie~w", [I]))),
+                      Name = iolist_to_atom(io_lib:format("zombie~w", [I])),
                       keep_alive(Name, fun() -> zombie(Mesg) end)
               end).
 
@@ -37,17 +62,7 @@ zombie() ->
     zombie("I'm still alive~n").
 
 register_zombie() ->
-    keep_alive(zombie, fun() ->
-                               zombie("I'm still alive~n")
-                       end).
-
-monitor_zombie() ->
-    on_exit(whereis(zombie),
-            fun(_) ->
-                    io:format("restarting zombie ...~n"),
-                    register_zombie(),
-                    monitor_zombie()
-            end).
+    keep_alive(zombie, fun() -> zombie("I'm still alive~n") end).
 
 spawn_with_timeout(Mod, Func, Args, Time) ->
     Pid = my_spawn(Mod, Func, Args),
